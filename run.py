@@ -1,18 +1,37 @@
-import streamlit as st
 import os
 import sys
-from pathlib import Path
+import subprocess
 
-# إضافة المسار الحالي للمشروع لضمان استيراد الموديولات (config, core, views)
-current_dir = Path(__file__).parent
-if str(current_dir) not in sys.path:
-    sys.path.append(str(current_dir))
+# 1. تحديد المسار الرئيسي للمشروع
+# هذا السطر يضمن أن النظام يرى مجلدات views و core و app مهما كان مكان التشغيل
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
 
-# استدعاء ملف التطبيق الأصلي
-try:
-    # نقوم بتشغيل محتوى الملف app/app.py
-    with open(current_dir / "app" / "app.py", encoding="utf-8") as f:
-        code = compile(f.read(), "app.py", "exec")
-        exec(code, globals())
-except Exception as e:
-    st.error(f"❌ خطأ في تحميل التطبيق الرئيسي: {e}")
+# 2. إضافة المسارات الفرعية للمكتبات
+# حل مشكلة "No module named views" من خلال تعريف المسار يدوياً للسيرفر
+sys.path.append(os.path.join(BASE_DIR, "app"))
+sys.path.append(os.path.join(BASE_DIR, "views"))
+sys.path.append(os.path.join(BASE_DIR, "core"))
+
+def run_app():
+    """تشغيل تطبيق Streamlit الأساسي من المجلد الفرعي"""
+    # المسار إلى ملف app.py الحقيقي
+    app_path = os.path.join(BASE_DIR, "app", "app.py")
+    
+    # أوامر التشغيل المتوافقة مع سيرفرات الاستضافة
+    command = [
+        "streamlit",
+        "run",
+        app_path,
+        "--server.port", "8501",
+        "--server.address", "0.0.0.0"
+    ]
+    
+    try:
+        print(f"🚀 Starting AI Clinic App from: {app_path}...")
+        subprocess.run(command, check=True)
+    except Exception as e:
+        print(f"❌ Error starting the app: {e}")
+
+if __name__ == "__main__":
+    run_app()
