@@ -4,31 +4,37 @@ from pathlib import Path
 import streamlit as st
 
 # ------------------------------------
-# 1. إعداد الصفحة والمسارات
+# 1. إعداد المسارات (حل مشكلة ModuleNotFoundError)
 # ------------------------------------
+# تحديد المسار الحالي للمجلد الرئيسي
+current_dir = Path(__file__).parent.absolute()
+
+# إضافة المسارات لنظام بايثون لضمان رؤية المجلدات الفرعية
+if str(current_dir) not in sys.path:
+    sys.path.append(str(current_dir))
+
+# تعريف المسارات الفرعية يدوياً لزيادة الاستقرار على Streamlit Cloud
+sys.path.append(os.path.join(current_dir, "views"))
+sys.path.append(os.path.join(current_dir, "core"))
+
+# إعداد الصفحة (يجب أن يظل أول أمر Streamlit)
 st.set_page_config(
     page_title="Pediatric Smart Clinic Assistant",
     layout="wide",
     page_icon="🩺"
 )
 
-# تحديد المسار الحالي (المجلد الرئيسي)
-BASE_DIR = Path(__file__).resolve().parent
-
-# إضافة المجلد الرئيسي للـ path لضمان رؤية المجلدات الفرعية (views, core)
-if str(BASE_DIR) not in sys.path:
-    sys.path.append(str(BASE_DIR))
-
-# مسار صورة واجهة الدخول (في مجلد pics داخل المجلد الرئيسي)
-LOGIN_IMAGE_PATH = BASE_DIR / "pics" / "photo.jpg"
+# مسار صورة واجهة الدخول
+LOGIN_IMAGE_PATH = current_dir / "pics" / "photo.jpg"
 
 # ------------------------------------
 # 2. دالة حماية النظام بكلمة سر
 # ------------------------------------
 def check_password():
     def password_entered():
-        # الأمان: يقرأ من Secrets (يفضل استخدام st.secrets مع Streamlit Cloud)
-        correct_password = st.secrets.get("MY_PASSWORD", os.environ.get("MY_PASSWORD", "Clinic2026"))
+        # الأمان: يقرأ من Secrets في Streamlit Cloud باسم MY_PASSWORD
+        # القيمة الافتراضية هي Clinic2026 في حال لم يتم ضبط الإعدادات
+        correct_password = st.secrets.get("MY_PASSWORD", "Clinic2026")
         
         if st.session_state["password_input"] == correct_password:
             st.session_state["password_correct"] = True
@@ -64,10 +70,10 @@ if not check_password():
     st.stop()
 
 # ============================================================
-# ⬇️ تحميل باقي التطبيق (المكتبات والصفحات) ⬇️
+# ⬇️ تحميل باقي التطبيق (المكتبات والصفحات) بعد تسجيل الدخول ⬇️
 # ============================================================
 
-# الآن الاستيراد سيعمل مباشرة لأننا في المجلد الرئيسي
+# استيراد الملفات من المجلدات التي قمنا بتعريف مسارها أعلاه
 from config import FILE_PATH, MODEL_PATH
 from core.utils_ml import build_engine
 from views.page_home import render_home_page
@@ -101,14 +107,15 @@ with st.sidebar:
 # التنقل (Navigation)
 page = st.sidebar.radio(
     "اختر الصفحة:",
-    ["الصفحة الرئيسية", "إدخال مريض جديد", "إدخال زيارة جديدة (روشتة متعددة)", "بحث عن مريض", "تحليلات العيادة", "توصية علاج (AI)"]
+    ["الصفحة الرئيسية", "إدخال مريض جديد", "إدخال زيارة جديدة", "بحث عن مريض", "تحليلات العيادة", "توصية علاج (AI)"]
 )
 
+# عرض الصفحة المختارة
 if page == "الصفحة الرئيسية":
     render_home_page()
 elif page == "إدخال مريض جديد":
     render_patient_form_page(FILE_PATH, engine)
-elif page == "إدخال زيارة جديدة (روشتة متعددة)":
+elif page == "إدخال زيارة جديدة":
     render_visit_form_page(FILE_PATH, engine)
 elif page == "بحث عن مريض":
     render_search_page(engine)
