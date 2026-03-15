@@ -7,7 +7,9 @@ import streamlit as st
 from core.utils_data import (
     load_data,
     load_reference_lists,
+    get_next_patient_id,
     get_next_visit_id,
+    save_patient,
     save_visit,
     save_visit_drugs,
 )
@@ -18,6 +20,95 @@ def render_visit_form_page(file_path, engine=None):
     st.header("🧾 إدخال زيارة جديدة (روشتة متعددة الأدوية)")
     st.markdown("---")
 
+    # ============================================
+    # تحميل البيانات والـ Reference Lists
+    # ============================================
+    try:
+        patients, visits, visit_drugs, ref, merged = load_data(file_path)
+    except Exception as e:
+        st.error(f"خطأ في تحميل البيانات من ملف الإكسل: {e}")
+        return
+
+    if patients.empty:
+        st.warning("لا يوجد مرضى في قاعدة البيانات. من فضلك أضف مريض أولًا.")
+
+    # ============================================
+    # Search Patient (Quick Lookup)
+    # ============================================
+    st.subheader("🔍 Search Patient")
+    search_query = st.text_input("Search by ID / Name / Phone", key="patient_search_query")
+    filtered_patients = patients
+    if search_query.strip():
+        q = search_query.strip()
+        mask = None
+        if "Patient_ID" in patients.columns:
+            m = patients["Patient_ID"].astype(str).str.contains(q, na=False)
+            mask = m if mask is None else (mask | m)
+        if "Patient_Name" in patients.columns:
+            m = patients["Patient_Name"].astype(str).str.contains(q, case=False, na=False)
+            mask = m if mask is None else (mask | m)
+        if "Phone_Number" in patients.columns:
+            m = patients["Phone_Number"].astype(str).str.contains(q, case=False, na=False)
+            mask = m if mask is None else (mask | m)
+        if mask is not None:
+            filtered_patients = patients[mask]
+    if not filtered_patients.empty:
+        cols = [c for c in ["Patient_ID", "Patient_Name", "Phone_Number"] if c in filtered_patients.columns]
+        st.dataframe(filtered_patients[cols], use_container_width=True)
+
+    st.markdown("---")
+    # ============================================
+    # New Patient (Inline)
+    # ============================================
+    st.subheader("➕ New Patient (Quick Add)")
+    new_patient_id = get_next_patient_id(file_path)
+    st.info(f"New Patient ID: **{new_patient_id}**")
+
+    with st.form("patient_form_inline"):
+        col1, col2 = st.columns(2)
+        with col1:
+            name = st.text_input("Patient Name")
+            gender = st.selectbox("Gender", ["Male", "Female"])
+            dob = st.date_input("Date of Birth")
+        with col2:
+            phone = st.text_input("Phone Number")
+            parent_name = st.text_input("Parent Name")
+            address = st.text_input("Address")
+
+        allergies = st.text_input("Allergies (optional)")
+        notes = st.text_area("Notes (optional)")
+
+        submitted_new = st.form_submit_button("Save Patient")
+
+    if submitted_new:
+        if not name.strip():
+            st.error("Please enter patient name.")
+        else:
+            row = {
+                "Patient_ID": int(new_patient_id),
+                "Patient_Name": name,
+                "Gender": gender,
+                "DOB": dob,
+                "Phone_Number": phone,
+                "Parent_Name": parent_name,
+                "Address": address,
+                "Allergies": allergies,
+                "Notes": notes,
+            }
+            try:
+                save_patient(file_path, row)
+                st.session_state["selected_patient_id"] = int(new_patient_id)
+                st.success(f"Patient saved: {new_patient_id}")
+                try:
+                    st.cache_data.clear()
+                    st.cache_resource.clear()
+                except Exception:
+                    pass
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to save patient: {e}")
+
+    st.markdown("---")
     # ============================================
     # Prescription Header Settings (Saved Locally)
     # ============================================
@@ -58,18 +149,10 @@ def render_visit_form_page(file_path, engine=None):
             profile = updated
             st.success("Header settings saved.")
 
-    # ============================================
-    # تحميل البيانات والـ Reference Lists
-    # ============================================
-    try:
-        patients, visits, visit_drugs, ref, merged = load_data(file_path)
-    except Exception as e:
-        st.error(f"خطأ في تحميل البيانات من ملف الإكسل: {e}")
+    if patients.empty:
+        st.info("Add a patient first to create a visit.")
         return
 
-    if patients.empty:
-        st.warning("لا يوجد مرضى في قاعدة البيانات. من فضلك أضف مريض أولًا.")
-        return
 
     (
         diag_list,
@@ -89,20 +172,39 @@ def render_visit_form_page(file_path, engine=None):
     st.info(f"سيتم تسجيل الزيارة برقم: **{new_visit_id}**")
 
     # ============================================
-    # اختيار Patient_ID (آخر مريض بشكل افتراضي)
+    # ?????? Patient_ID (??? ???? ???? ???????)
     # ============================================
+    base_patients = filtered_patients if search_query.strip() else patients
+
     try:
-        patient_ids = sorted(patients["Patient_ID"].dropna().astype(int).unique())
+        patient_ids = sorted(base_patients["Patient_ID"].dropna().astype(int).unique())
     except Exception:
-        patient_ids = sorted(patients["Patient_ID"].dropna().unique())
+        patient_ids = sorted(base_patients["Patient_ID"].dropna().unique())
 
-    default_index = len(patient_ids) - 1 if len(patient_ids) > 0 else 0
+    patient_name_map = {}
+    try:
+        for _, row in base_patients.iterrows():
+            pid = row.get("Patient_ID")
+            try:
+                pid_int = int(pid)
+            except Exception:
+                continue
+            patient_name_map[pid_int] = str(row.get("Patient_Name", ""))
+    except Exception:
+        pass
 
-    st.subheader("🧒 اختيار المريض")
+    selected_id = st.session_state.get("selected_patient_id")
+    if selected_id in patient_ids:
+        default_index = patient_ids.index(selected_id)
+    else:
+        default_index = len(patient_ids) - 1 if len(patient_ids) > 0 else 0
+
+    st.subheader("🧒 ?????? ??????")
     patient_id = st.selectbox(
-        "Patient ID (رقم المريض)",
+        "Patient ID (??? ??????)",
         options=patient_ids,
         index=default_index,
+        format_func=lambda pid: f"{pid} - {patient_name_map.get(pid, '')}".strip(' -'),
     )
 
     # ============================================

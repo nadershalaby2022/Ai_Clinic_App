@@ -18,7 +18,6 @@ from core.utils_ml import build_engine
 from core.utils_auth import authenticate_admin, save_guest_login
 from core.ui_ads import render_vip_sponsors, render_sponsor_footer, render_sponsor_sidebar
 from views.page_home import render_home_page
-from views.page_patient_form import render_patient_form_page
 from views.page_visit_form import render_visit_form_page
 from views.page_search import render_search_page
 from views.page_analytics import render_analytics_page
@@ -124,7 +123,6 @@ def main() -> None:
 
     pages = [
         "Home",
-        "New Patient",
         "New Visit",
         "Search Patient",
         "Clinic Analytics",
@@ -140,8 +138,6 @@ def main() -> None:
 
     if page == "Home":
         render_home_page()
-    elif page == "New Patient":
-        render_patient_form_page(FILE_PATH, engine)
     elif page == "New Visit":
         render_visit_form_page(FILE_PATH, engine)
     elif page == "Search Patient":
