@@ -1,5 +1,7 @@
 # app/views/page_visit_form.py
 
+from pathlib import Path
+
 import streamlit as st
 
 from core.utils_data import (
@@ -9,11 +11,52 @@ from core.utils_data import (
     save_visit,
     save_visit_drugs,
 )
+from core.prescription import load_profile, save_profile, generate_prescription_pdf
 
 
 def render_visit_form_page(file_path, engine=None):
     st.header("🧾 إدخال زيارة جديدة (روشتة متعددة الأدوية)")
     st.markdown("---")
+
+    # ============================================
+    # Prescription Header Settings (Saved Locally)
+    # ============================================
+    profile = load_profile()
+    with st.expander("Prescription Header Settings (saved on this device)", expanded=False):
+        col_a, col_b = st.columns(2)
+        with col_a:
+            clinic_name = st.text_input("Clinic Name", value=profile.get("clinic_name", ""))
+            doctor_name = st.text_input("Doctor Name", value=profile.get("doctor_name", ""))
+            doctor_title_1 = st.text_input(
+                "Title Line 1", value=profile.get("doctor_title_1", "")
+            )
+            doctor_title_2 = st.text_input(
+                "Title Line 2", value=profile.get("doctor_title_2", "")
+            )
+        with col_b:
+            clinic_address = st.text_input(
+                "Clinic Address", value=profile.get("clinic_address", "")
+            )
+            clinic_phones = st.text_input(
+                "Clinic Phones", value=profile.get("clinic_phones", "")
+            )
+            footer_note = st.text_input(
+                "Footer Note", value=profile.get("footer_note", "")
+            )
+
+        if st.button("Save Header Settings"):
+            updated = {
+                "clinic_name": clinic_name,
+                "doctor_name": doctor_name,
+                "doctor_title_1": doctor_title_1,
+                "doctor_title_2": doctor_title_2,
+                "clinic_address": clinic_address,
+                "clinic_phones": clinic_phones,
+                "footer_note": footer_note,
+            }
+            save_profile(updated)
+            profile = updated
+            st.success("Header settings saved.")
 
     # ============================================
     # تحميل البيانات والـ Reference Lists
@@ -281,6 +324,30 @@ def render_visit_form_page(file_path, engine=None):
             st.error(f"حدث خطأ أثناء حفظ البيانات في ملف الإكسل: {e}")
             return
 
+        patient_name = ""
+        try:
+            if "Patient_Name" in patients.columns:
+                pid_str = str(patient_id)
+                matched = patients[patients["Patient_ID"].astype(str) == pid_str]
+                if not matched.empty:
+                    patient_name = str(matched.iloc[0]["Patient_Name"])
+        except Exception:
+            patient_name = ""
+
+        st.session_state["last_visit_payload"] = {
+            "visit_info": {
+                "visit_id": new_visit_id,
+                "visit_date": str(visit_date),
+                "diagnosis": diagnosis,
+            },
+            "patient_info": {
+                "patient_id": patient_id,
+                "patient_name": patient_name,
+            },
+            "drugs": drug_rows_to_save,
+        }
+        st.session_state["last_prescription_pdf"] = None
+
         st.success(
             f"تم حفظ الزيارة رقم {new_visit_id} للمريض رقم {patient_id} "
             f"مع عدد {len(drug_rows_to_save)} سطر دواء ✅"
@@ -293,4 +360,68 @@ def render_visit_form_page(file_path, engine=None):
         except Exception:
             pass
 
-        st.rerun()
+
+    # ============================================
+    # Print Prescription (PDF)
+    # ============================================
+    st.markdown("---")
+    st.subheader("Print Prescription")
+    payload = st.session_state.get("last_visit_payload")
+    if payload:
+        if st.button("Generate Prescription PDF"):
+            try:
+                current_profile = load_profile()
+                pdf_path = generate_prescription_pdf(
+                    current_profile,
+                    payload["visit_info"],
+                    payload["patient_info"],
+                    payload["drugs"],
+                )
+                st.session_state["last_prescription_pdf"] = str(pdf_path)
+                st.success("Prescription PDF generated.")
+            except Exception as exc:
+                st.error(f"Failed to generate prescription PDF: {exc}")
+
+        pdf_path_str = st.session_state.get("last_prescription_pdf")
+        if pdf_path_str:
+            pdf_path = Path(pdf_path_str)
+            if pdf_path.exists():
+                st.download_button(
+                    "Download Prescription PDF",
+                    data=pdf_path.read_bytes(),
+                    file_name=pdf_path.name,
+                    mime="application/pdf",
+                    use_container_width=True,
+                )
+    else:
+        st.info("Save a visit first to enable prescription printing.")
+
+    # ============================================
+    # Privacy / Session
+    # ============================================
+    st.markdown("---")
+    st.subheader("Privacy & Session")
+    st.caption(
+        "For privacy, you can clear the session after finishing. This will remove "
+        "temporary data from memory and return you to the login screen."
+    )
+
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        if st.button("Clear Session (Privacy)", use_container_width=True):
+            try:
+                st.session_state.clear()
+                st.cache_data.clear()
+                st.cache_resource.clear()
+            except Exception:
+                pass
+            st.success("Session cleared. Please sign in again.")
+            st.rerun()
+    with col_p2:
+        if st.button("Clear Cache", use_container_width=True):
+            try:
+                st.cache_data.clear()
+                st.cache_resource.clear()
+            except Exception:
+                pass
+            st.success("Cache cleared.")
