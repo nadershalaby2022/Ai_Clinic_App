@@ -1,5 +1,15 @@
-﻿import sys
+import sys
 from pathlib import Path
+
+# ---- Path setup (must run before local imports) ----
+BASE_DIR = Path(__file__).resolve().parent
+APP_DIR = BASE_DIR / "app"
+VIEWS_DIR = APP_DIR / "views"
+CORE_DIR = BASE_DIR / "core"
+
+for path in [BASE_DIR, APP_DIR, VIEWS_DIR, CORE_DIR]:
+    if path.exists() and str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 import streamlit as st
 
@@ -15,18 +25,6 @@ from views.page_analytics import render_analytics_page
 from views.page_ai_reco import render_ai_reco_page
 from views.page_admin_accounts import render_admin_accounts_page
 from views.page_sponsors import render_sponsors_page
-
-
-# ---- Path setup ----
-BASE_DIR = Path(__file__).resolve().parent
-APP_DIR = BASE_DIR / "app"
-VIEWS_DIR = APP_DIR / "views"
-CORE_DIR = BASE_DIR / "core"
-
-for path in [BASE_DIR, APP_DIR, VIEWS_DIR, CORE_DIR]:
-    if path.exists() and str(path) not in sys.path:
-        sys.path.insert(0, str(path))
-
 
 st.set_page_config(
     page_title="AI Clinic App",
