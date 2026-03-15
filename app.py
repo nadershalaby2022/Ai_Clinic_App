@@ -60,7 +60,7 @@ def _render_login() -> None:
         return en if lang == "en" else ar
 
     st.title(_t("Clinic & drug analysis and its effectiveness", "منصة دعم القرار السريري"))
-
+    st.title(_t("نموذج اختبار البرنامج قبل شرائة"))
     render_vip_sponsors()
 
     col_left, col_right = st.columns([1.1, 0.9], gap="large")
@@ -105,10 +105,10 @@ def _render_login() -> None:
                 )
                 st.success(_t(f"Welcome, {guest_name.strip()}", f"مرحبًا، {guest_name.strip()}"))
                 st.rerun()
-
+              
     render_sponsor_footer()
 
-
+    st.subheader(_t("لطلب البرنامج اتصل على 01016050604 "))
 def main() -> None:
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
