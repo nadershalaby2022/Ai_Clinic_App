@@ -59,8 +59,8 @@ def _render_login() -> None:
     def _t(en: str, ar: str) -> str:
         return en if lang == "en" else ar
 
-    st.title(_t("Clinic & drug analysis and its effectiveness", "منصة دعم القرار السريري"))
-    st.subheader("لطلب البرنامج اتصل على 01016050604")
+   st.title("Clinic & drug analysis and its effectiveness | منصة دعم القرار السريري")
+    st.subheader("لطلب البرنامج ليعمل على جهاز الكمبيوتر أو اللابتوب الخاص بك  اتصل على 01016050604")
   
     render_vip_sponsors()
 
