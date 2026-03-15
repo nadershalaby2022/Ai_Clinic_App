@@ -59,7 +59,7 @@ def _render_login() -> None:
     def _t(en: str, ar: str) -> str:
         return en if lang == "en" else ar
 
-    st.title(_t("Clinical Decision Support Platform", "منصة دعم القرار السريري"))
+    st.title(_t("Clinic & drug analysis and its effectiveness", "منصة دعم القرار السريري"))
 
     render_vip_sponsors()
 
