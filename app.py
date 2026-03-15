@@ -61,7 +61,7 @@ def _render_login() -> None:
 
     st.title(_t("Clinic & drug analysis and its effectiveness", "منصة دعم القرار السريري"))
     st.title(_t("نموذج اختبار البرنامج قبل شرائة"))
-    st.subheader(_t("لطلب البرنامج اتصل على 01016050604 ")) 
+  
     render_vip_sponsors()
 
     col_left, col_right = st.columns([1.1, 0.9], gap="large")
