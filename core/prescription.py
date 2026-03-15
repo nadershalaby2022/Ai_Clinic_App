@@ -115,3 +115,235 @@ def generate_prescription_pdf(
     c.showPage()
     c.save()
     return file_path
+
+
+def build_prescription_html(
+    profile: dict[str, Any],
+    visit_info: dict[str, Any],
+    patient_info: dict[str, Any],
+    drugs: list[dict[str, Any]],
+    lang: str = "en",
+) -> str:
+    rtl = lang == "ar"
+    direction = "rtl" if rtl else "ltr"
+    now = datetime.now().strftime("%Y-%m-%d  %H:%M")
+
+    def _t(en: str, ar: str) -> str:
+        return ar if rtl else en
+
+    def _safe(x: Any) -> str:
+        return "" if x is None else str(x)
+
+    drug_rows = ""
+    for idx, row in enumerate(drugs, start=1):
+        drug = _safe(row.get("Drug_Name", ""))
+        dose = f"{_safe(row.get('Dose_Value', ''))} {_safe(row.get('Dose_Unit', ''))}".strip()
+        freq = f"{_safe(row.get('Freq_Value', ''))} {_safe(row.get('Freq_Unit', ''))}".strip()
+        dur = f"{_safe(row.get('Duration_Days', ''))}".strip()
+        route = _safe(row.get("Route", ""))
+        instructions = _safe(row.get("Instructions", ""))
+
+        drug_rows += f"""
+<tr>
+  <td>{idx}</td>
+  <td>{drug}</td>
+  <td>{dose}</td>
+  <td>{freq}</td>
+  <td>{dur}</td>
+  <td>{route}</td>
+  <td>{instructions}</td>
+</tr>
+"""
+
+    diagnosis = _safe(visit_info.get("diagnosis", ""))
+    doctor_pill = _safe(profile.get("doctor_name", ""))
+    diag_pill = diagnosis
+
+    html = f"""
+<!doctype html>
+<html lang="{lang}" dir="{direction}">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>{_t("Prescription Report", "تقرير الروشتة")}</title>
+<style>
+  body {{
+    font-family: "Tahoma","Arial",sans-serif;
+    direction: {direction};
+    margin: 24px;
+    color: #111827;
+  }}
+  .card {{
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 18px;
+    background: #ffffff;
+  }}
+  .header {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 1px dashed #e5e7eb;
+    padding-bottom: 12px;
+    margin-bottom: 14px;
+  }}
+  .title {{
+    font-size: 20px;
+    font-weight: 900;
+    margin: 0;
+  }}
+  .sub {{
+    font-size: 12.5px;
+    color: #374151;
+    margin-top: 6px;
+    line-height: 1.8;
+  }}
+  .pill {{
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    font-size: 12.5px;
+    font-weight: 800;
+    margin-left: 8px;
+  }}
+  .grid {{
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin: 12px 0 16px;
+  }}
+  .box {{
+    background: #f9fafb;
+    border: 1px solid #eef2f7;
+    border-radius: 12px;
+    padding: 10px 12px;
+  }}
+  .box .k {{
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }}
+  .box .v {{
+    font-size: 16px;
+    font-weight: 900;
+  }}
+  table {{
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 13px;
+  }}
+  thead th {{
+    background: #111827;
+    color: #fff;
+    padding: 10px;
+    text-align: center;
+    font-weight: 900;
+  }}
+  tbody td {{
+    border-bottom: 1px solid #e5e7eb;
+    padding: 10px;
+    text-align: center;
+  }}
+  .section-title {{
+    margin-top: 16px;
+    font-size: 14.5px;
+    font-weight: 900;
+  }}
+  .footer-note {{
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed #e5e7eb;
+    font-size: 12.5px;
+    color: #374151;
+    line-height: 1.8;
+  }}
+  @media print {{
+    body {{ margin: 0; }}
+    .no-print {{ display: none !important; }}
+  }}
+  .print-btn {{
+    background: #111827;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-weight: 900;
+    cursor: pointer;
+  }}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div>
+        <p class="title">{_t("Prescription Report", "تقرير الروشتة")}</p>
+        <div class="sub">
+          {f'<span class="pill">{doctor_pill}</span>' if doctor_pill else ''}
+          {f'<span class="pill">{diag_pill}</span>' if diag_pill else ''}
+          <span>{_t("Report Date", "تاريخ التقرير")}: <b>{now}</b></span>
+        </div>
+      </div>
+      <div style="text-align:{'left' if rtl else 'right'}">
+        <div style="font-weight:900">{_safe(profile.get('clinic_name', ''))}</div>
+        <div class="sub">
+          <div><b>{_safe(profile.get('doctor_name', ''))}</b></div>
+          <div>{_safe(profile.get('doctor_title_1', ''))}</div>
+          <div>{_safe(profile.get('doctor_title_2', ''))}</div>
+          <div>{_safe(profile.get('clinic_address', ''))}</div>
+          <div>{_safe(profile.get('clinic_phones', ''))}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="box">
+        <div class="k">{_t("Patient ID", "رقم المريض")}</div>
+        <div class="v">{_safe(patient_info.get("patient_id", ""))}</div>
+      </div>
+      <div class="box">
+        <div class="k">{_t("Patient Name", "اسم المريض")}</div>
+        <div class="v">{_safe(patient_info.get("patient_name", ""))}</div>
+      </div>
+      <div class="box">
+        <div class="k">{_t("Visit ID", "رقم الزيارة")}</div>
+        <div class="v">{_safe(visit_info.get("visit_id", ""))}</div>
+      </div>
+      <div class="box">
+        <div class="k">{_t("Visit Date", "تاريخ الزيارة")}</div>
+        <div class="v">{_safe(visit_info.get("visit_date", ""))}</div>
+      </div>
+    </div>
+
+    <div class="section-title">{_t("Medications", "الأدوية")}</div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>{_t("Drug", "الدواء")}</th>
+          <th>{_t("Dose", "الجرعة")}</th>
+          <th>{_t("Frequency", "التكرار")}</th>
+          <th>{_t("Days", "الأيام")}</th>
+          <th>{_t("Route", "الطريقة")}</th>
+          <th>{_t("Notes", "ملاحظات")}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {drug_rows}
+      </tbody>
+    </table>
+
+    <div class="footer-note">
+      {_safe(profile.get("footer_note", ""))}
+    </div>
+
+    <div class="no-print" style="margin-top:12px; text-align:left;">
+      <button class="print-btn" onclick="window.print()">{_t("Print", "طباعة")}</button>
+    </div>
+  </div>
+</body>
+</html>
+"""
+    return html
